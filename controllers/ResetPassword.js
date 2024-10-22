@@ -2,6 +2,7 @@ const { findOne } = require("../models/OTP");
 const User = require("../models/User");
 const mailSender= require("../utils/mailSender");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 //reset passaword token
 exports.resetPasswordToken = async(req,res)=>{
@@ -39,11 +40,11 @@ exports.resetPasswordToken = async(req,res)=>{
         )
 
         //create url
-        const url = `http://localhost:3000/update-password/${token}`;
-
+        const url = `http://localhost:4000/reset-password/${token}`;
+        console.log("url : " ,url );
         //send mail containing url
-
-        await mailSender(email,"The link for reset Password",token);
+        console.log(token);
+        await mailSender(email,url,"The link for reset Password");
 
         //return response
         return res.status(200).json({

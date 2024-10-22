@@ -11,7 +11,7 @@ const CourseSchema = new mongoose.Schema({
         trim : true,
         
       },
-      intructor : {
+      instructor : {
         type : mongoose.Schema.Types.ObjectId,
         required : true,
         Ref : "User"
@@ -19,11 +19,11 @@ const CourseSchema = new mongoose.Schema({
       whatYouWillLearn : {
         type : String
       },
-      courseContent : {
+      courseContent : [{
         type : mongoose.Schema.Types.ObjectId,
         ref : "Section"
-      },
-      retingAndReviews : [{
+      }],
+      ratingAndReviews : [{
         type : mongoose.Schema.Types.ObjectId,
         ref : "RatingAndReviews",
       }],
@@ -35,14 +35,17 @@ const CourseSchema = new mongoose.Schema({
         type : String,
         required : true
       },
-      tag : {
+      tag :[ {
+        type : String
+      }],
+      category : {
         type : mongoose.Schema.Types.ObjectId,
-        ref : "Tag"
+        ref : "Category"
       },
-      studentEnrolled : {
+      studentEnrolled : [{
         type : mongoose.Schema.Types.ObjectId,
         ref : "User"
-      }
+      }]
 
 });
 

@@ -3,6 +3,8 @@ const otpGenerator = require('otp-generator');
 const OTP = require('../models/OTP');
 const bcrypt = require('bcrypt');
 const jwt = require("jsonwebtoken");
+const mailSender = require('../utils/mailSender');
+const Profile =require("../models/profile");
 
 require("dotenv").config();
 
@@ -13,7 +15,7 @@ exports.sendOTP = async(req,res)=>{
         const {email}= req.body;
 
         //check user already exist
-       const userExist =  await User.find({email});
+       const userExist =  await User.findOne({email : email});
 
        //if user exist
        if(userExist){
@@ -34,20 +36,20 @@ exports.sendOTP = async(req,res)=>{
        //check otp is unique or not
        let otpExist = await OTP.findOne({otp : otp});
 
-       while(otpExist){
-        otp = otpGenerator.generate(6,{
-        upperCaseAlphabets:false,
-        lowerCaseAlphabets:false,
-        specialChars:false
-       });
+    //    while(otpExist === otp){
+    //     otp = otpGenerator.generate(6,{
+    //     upperCaseAlphabets:false,
+    //     lowerCaseAlphabets:false,
+    //     specialChars:false
+    //    });
 
-       otpExist = await OTP.findOne({otp : otp});
-       }
+    //    otpExist = await OTP.findOne({otp : otp});
+    //    }
 
-       const otpBody = OTP.create({email,otp});
+       const otpBody = await OTP.create({email,otp});
        console.log(otpBody);
 
-       res.send(200).json({
+      return res.status(200).json({
         success:true,
         message: "OTP created successfully",
         otp
@@ -65,10 +67,10 @@ exports.sendOTP = async(req,res)=>{
 
 //signup
 
-const signUp = async(req,res)=>{
+exports.signUp = async(req,res)=>{
     try {
           const {firstName , lastName , email , accountType ,otp,
-        password , confirmPassword ,contactNumber
+        password , confirmPassword 
     } = req.body;
 
     //validate data
@@ -90,7 +92,7 @@ const signUp = async(req,res)=>{
 
     //check if user already exist
 
-    const userExist = await User.find({email});
+    const userExist = await User.findOne({email :email});
     if (userExist){
         return res.status(400).json({
             success : false,
@@ -99,7 +101,7 @@ const signUp = async(req,res)=>{
     }
 
     //find most recent otp
-    const recentOtp = await OTP.find({email}).sort({createAt : -1}).limit(1);
+    const recentOtp = await OTP.find({email :email}).sort({createdAt : -1}).limit(1);
     //validate otp
     if (recentOtp.length == 0){
         return res.status(400).json({
@@ -109,7 +111,7 @@ const signUp = async(req,res)=>{
     }
 
     //verify otp
-    if(otp !== recentOtp.otp){
+    if(otp !== recentOtp[0].otp){
         return res.status(400).json({
             success : false,
             message : "Invalid Otp"
@@ -132,7 +134,6 @@ const signUp = async(req,res)=>{
         firstName,
         lastName,
         email,
-        contactNumber,
         password:hashedPassword,
         accountType,
         additionalDetails : profileDetails._id,
@@ -141,7 +142,7 @@ const signUp = async(req,res)=>{
 
     //return res
 
-    return res.status(200).json({
+    return res.status(200).json({  
         success:true,
         message : "User registered successfully"
     })
@@ -173,7 +174,7 @@ exports.login = async(req,res)=>{
         }
 
         //check user is registered or not
-        const userExist = await User.find({email});
+        const userExist = await User.findOne({email:email});
 
         if(!userExist){
             return res.status(400).json({
@@ -182,10 +183,10 @@ exports.login = async(req,res)=>{
             })
         } 
         //authenticate user and generate jwt  
-       
+       console.log(userExist.password);
         if (await bcrypt.compare(password,userExist.password)){
            const payload = {
-            email :userExist.email,
+            email :userExist.email, 
             id : userExist._id,
             accountType : userExist.accountType
            }
@@ -232,23 +233,69 @@ exports.login = async(req,res)=>{
 //change password
 
 exports.changePassword =async(req,res)=>{
-    //get data from body
-    const {oldPassword ,newPassword , confirmPassword} = req.body;
-    //get old password
-    //validation
-    if( !oldPassword || !newPassword || !confirmPassword){
-        return res.status(400).json({
+
+    try {
+         //get user data
+        const userId = req.user.id;
+        const userDetails = await User.findById(userId);
+
+        if(!userDetails){
+            return res.status(401).json({
+                success : false,
+                message : "User not found"
+            })
+        }
+        //get data from body
+        const {oldPassword ,newPassword , confirmPassword} = req.body;
+        //get old password
+        //validation
+        if( !oldPassword || !newPassword || !confirmPassword){
+            return res.status(400).json({
+                success:false,
+                message : "All fields are required"
+            })
+        }
+        
+
+        if(!(await bcrypt.compare(oldPassword,userDetails.password))){
+            return res.status(400).json({
+                success : false,
+                message : "Incorrect password"
+            })
+        }
+
+        if(newPassword !== confirmPassword){
+            return res.status(400).json({
+                success : false,
+                message : " password can not match"
+            })
+        }
+
+        //hash password
+        const hashedPassword = await bcrypt.hash(newPassword,10);
+
+        //update password in db
+        const updatedUser = await User.findByIdAndUpdate(userId,
+                                        {password : hashedPassword},
+                                        {new:true}
+        )
+        //send mail --password updated
+        await mailSender(updatedUser.email,
+                            "password update",
+                            "password updated succesfully"
+        )
+        //return response
+        return res.status(200).json({
+            success : true,
+            message : "password updated successfully"
+        })
+
+        
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({
             success:false,
-            message : "All fields are required"
+            message:"Failed to update password"
         })
     }
-    
-    const user = await User.findOne({email});
-
-    if(await bcrypt.compare(oldPassword,user.password)){
-
-    }
-    //update password in db
-    //send mail --password updated
-    //return response
 }

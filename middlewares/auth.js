@@ -4,11 +4,12 @@ const User = require("../models/User");
 
 //auth
 exports.auth = async(req,res,next)=>{
-    try {
+    // try {
         //extract token
-        const token = req.cookies.token
-                    || req.body.token 
-                    ||req.header("Authorisation").replace("Bearer","");
+        // console.log(req.cookies);
+        const token =req.cookies.token
+                     || req.body.token 
+                    ||req.header("Authorization").replace("Bearer ","");
 
         if(!token){
             return res.status(401).json({
@@ -16,10 +17,11 @@ exports.auth = async(req,res,next)=>{
                 message : "Token is missing"
             })
         }
+        // console.log(token);
 
         //verify token
         try {
-            const decode= jwt.verify(token,process.env.JWT_TOKEN);
+            const decode= jwt.verify(token,process.env.JWT_SECRET);
             
             req.user=decode;
         } catch (error) {
@@ -31,12 +33,12 @@ exports.auth = async(req,res,next)=>{
         next();
 
 
-    } catch (error) {
-        return res.status(500).json({
-            success : false,
-            message: "Something went wrong while validating a token"
-        });
-    }
+    // } catch (error) {
+    //     return res.status(500).json({
+    //         success : false,
+    //         message: "Something went wrong while validating a token"
+    //     });
+    // }
 }
 
 
